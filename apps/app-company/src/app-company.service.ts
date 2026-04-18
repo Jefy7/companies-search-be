@@ -1,78 +1,69 @@
 import { Injectable } from '@nestjs/common';
-import { CacheService } from '@lib/cache';
-import {
-  CompanyRecord,
-  CompanySearchFilters,
-  CompanySearchParams,
-  DbService,
-} from '@lib/db';
+import { DbService } from '@lib/db';
 import { LoggerService } from '@lib/logger';
+import { AiService } from './ai/ai.service';
 
-export interface CompanySearchRequest extends CompanySearchParams {}
+export interface SearchCompaniesParams {
+  query: string;
+  sector?: string;
+  location?: string;
+  page: number;
+  limit: number;
+}
 
-export interface CompanySearchResponse {
+export interface SearchCompaniesResponse {
+  data: Awaited<ReturnType<DbService['search']>>['data'];
   total: number;
-  items: CompanyRecord[];
-  cached: boolean;
+  page: number;
+  limit: number;
+  aiSuggestions: string[];
 }
 
 @Injectable()
 export class AppCompanyService {
+  private static readonly AI_CONFIDENCE_THRESHOLD = 0.7;
+
   constructor(
     private readonly dbService: DbService,
-    private readonly cacheService: CacheService,
+    private readonly aiService: AiService,
     private readonly loggerService: LoggerService,
   ) {}
 
-  searchCompanies(request: CompanySearchRequest): CompanySearchResponse {
-    const safeQuery = request.query.trim();
-    if (!safeQuery) {
-      return { total: 0, items: [], cached: false };
-    }
+  async searchCompanies(params: SearchCompaniesParams): Promise<SearchCompaniesResponse> {
+    const aiResult = await this.aiService.enhanceSearch(params.query);
 
-    const cacheKey = this.buildCacheKey(safeQuery, request.filters, request.limit);
-    const cached = this.cacheService.get<CompanyRecord[]>(cacheKey);
+    const canApplyAi =
+      aiResult !== null && aiResult.confidence >= AppCompanyService.AI_CONFIDENCE_THRESHOLD;
 
-    if (cached) {
-      this.loggerService.info('Company search cache hit', 'AppCompanyService', {
-        query: safeQuery,
+    const mergedFilters = {
+      sector: params.sector ?? (canApplyAi ? aiResult.filters.sector : undefined),
+      location: params.location ?? (canApplyAi ? aiResult.filters.location : undefined),
+      tags: canApplyAi ? aiResult.filters.tags ?? [] : [],
+    };
+
+    const similarTerms = canApplyAi ? aiResult.similarTerms : [];
+
+    if (!canApplyAi && aiResult !== null) {
+      this.loggerService.info('AI confidence below threshold, fallback to user input', 'AppCompanyService', {
+        confidence: aiResult.confidence,
+        threshold: AppCompanyService.AI_CONFIDENCE_THRESHOLD,
       });
-      return {
-        total: cached.length,
-        items: cached,
-        cached: true,
-      };
     }
 
-    const items = this.dbService.searchCompanies({
-      query: safeQuery,
-      filters: request.filters,
-      limit: request.limit,
-    });
-
-    this.cacheService.set(cacheKey, items, 120_000);
-    this.loggerService.info('Company search executed', 'AppCompanyService', {
-      query: safeQuery,
-      total: items.length,
-    });
+    const result = await this.dbService.search(
+      mergedFilters,
+      params.query,
+      similarTerms,
+      { page: params.page, limit: params.limit },
+    );
 
     return {
-      total: items.length,
-      items,
-      cached: false,
+      ...result,
+      aiSuggestions: canApplyAi ? aiResult.suggestions : [],
     };
   }
 
-  getCompanyById(id: string): CompanyRecord | null {
-    const company = this.dbService.findById(id);
-    return company ?? null;
-  }
-
-  private buildCacheKey(
-    query: string,
-    filters?: CompanySearchFilters,
-    limit?: number,
-  ): string {
-    return JSON.stringify({ query, filters: filters ?? {}, limit: limit ?? 10 });
+  async getCompanyById(id: string) {
+    return this.dbService.findById(id);
   }
 }

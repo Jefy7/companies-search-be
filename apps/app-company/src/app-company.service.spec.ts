@@ -1,18 +1,20 @@
-import { CacheService } from '@lib/cache';
 import { DbService } from '@lib/db';
 import { LoggerService } from '@lib/logger';
+import { AiService } from './ai/ai.service';
 import { AppCompanyService } from './app-company.service';
 
 describe('AppCompanyService', () => {
   let service: AppCompanyService;
+
   const dbMock = {
-    searchCompanies: jest.fn(),
+    search: jest.fn(),
     findById: jest.fn(),
   };
-  const cacheMock = {
-    get: jest.fn(),
-    set: jest.fn(),
+
+  const aiMock = {
+    enhanceSearch: jest.fn(),
   };
+
   const loggerMock = {
     info: jest.fn(),
   };
@@ -20,36 +22,98 @@ describe('AppCompanyService', () => {
   beforeEach(() => {
     service = new AppCompanyService(
       dbMock as unknown as DbService,
-      cacheMock as unknown as CacheService,
+      aiMock as unknown as AiService,
       loggerMock as unknown as LoggerService,
     );
     jest.clearAllMocks();
   });
 
-  it('returns cached search results when available', () => {
-    cacheMock.get.mockReturnValue([{ id: 'c-101' }]);
+  it('applies AI filters and suggestions when confidence is high', async () => {
+    aiMock.enhanceSearch.mockResolvedValue({
+      filters: { sector: 'Fintech', location: 'London', tags: ['payments'] },
+      similarTerms: ['digital payments'],
+      suggestions: ['Top fintech payment companies in UK'],
+      confidence: 0.92,
+    });
 
-    const response = service.searchCompanies({ query: 'ai' });
+    dbMock.search.mockResolvedValue({
+      data: [{ id: '1' }],
+      total: 1,
+      page: 1,
+      limit: 20,
+    });
 
-    expect(response.cached).toBe(true);
-    expect(response.total).toBe(1);
-    expect(dbMock.searchCompanies).not.toHaveBeenCalled();
+    const result = await service.searchCompanies({
+      query: 'fintech in london',
+      page: 1,
+      limit: 20,
+    });
+
+    expect(dbMock.search).toHaveBeenCalledWith(
+      { sector: 'Fintech', location: 'London', tags: ['payments'] },
+      'fintech in london',
+      ['digital payments'],
+      { page: 1, limit: 20 },
+    );
+    expect(result.aiSuggestions).toEqual(['Top fintech payment companies in UK']);
   });
 
-  it('searches database and caches results on miss', () => {
-    cacheMock.get.mockReturnValue(null);
-    dbMock.searchCompanies.mockReturnValue([{ id: 'c-102' }, { id: 'c-103' }]);
+  it('falls back to user filters when AI fails', async () => {
+    aiMock.enhanceSearch.mockResolvedValue(null);
+    dbMock.search.mockResolvedValue({ data: [], total: 0, page: 1, limit: 20 });
 
-    const response = service.searchCompanies({ query: 'security' });
+    await service.searchCompanies({
+      query: 'fintech',
+      sector: 'Fintech',
+      location: 'London',
+      page: 1,
+      limit: 20,
+    });
 
-    expect(response.cached).toBe(false);
-    expect(response.total).toBe(2);
-    expect(cacheMock.set).toHaveBeenCalled();
+    expect(dbMock.search).toHaveBeenCalledWith(
+      { sector: 'Fintech', location: 'London', tags: [] },
+      'fintech',
+      [],
+      { page: 1, limit: 20 },
+    );
   });
 
-  it('finds company by id', () => {
-    dbMock.findById.mockReturnValue({ id: 'c-101' });
+  it('returns no results payload correctly', async () => {
+    aiMock.enhanceSearch.mockResolvedValue(null);
+    dbMock.search.mockResolvedValue({ data: [], total: 0, page: 2, limit: 10 });
 
-    expect(service.getCompanyById('c-101')).toEqual({ id: 'c-101' });
+    const result = await service.searchCompanies({
+      query: 'unknown',
+      page: 2,
+      limit: 10,
+    });
+
+    expect(result).toEqual({
+      data: [],
+      total: 0,
+      page: 2,
+      limit: 10,
+      aiSuggestions: [],
+    });
+  });
+
+  it('passes pagination correctly', async () => {
+    aiMock.enhanceSearch.mockResolvedValue(null);
+    dbMock.search.mockResolvedValue({ data: [], total: 0, page: 3, limit: 5 });
+
+    await service.searchCompanies({ query: 'payments', page: 3, limit: 5 });
+
+    expect(dbMock.search).toHaveBeenCalledWith(
+      { sector: undefined, location: undefined, tags: [] },
+      'payments',
+      [],
+      { page: 3, limit: 5 },
+    );
+  });
+
+  it('finds company by id', async () => {
+    dbMock.findById.mockResolvedValue({ id: 'c-101' });
+
+    await expect(service.getCompanyById('c-101')).resolves.toEqual({ id: 'c-101' });
   });
 });

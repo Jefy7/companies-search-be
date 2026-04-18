@@ -25,31 +25,35 @@ describe('AppCompanyController', () => {
     jest.clearAllMocks();
   });
 
-  it('should call search endpoint with mapped query params', () => {
-    serviceMock.searchCompanies.mockReturnValue({ total: 0, items: [], cached: false });
+  it('should call search endpoint with mapped query params', async () => {
+    serviceMock.searchCompanies.mockResolvedValue({
+      data: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      aiSuggestions: [],
+    });
 
-    controller.search({
-      q: 'ai',
-      country: 'United States',
-      minEmployees: '100',
-      limit: '5',
+    await controller.search({
+      query: 'ai',
+      sector: 'Fintech',
+      location: 'United Kingdom',
+      page: 2,
+      limit: 5,
     });
 
     expect(serviceMock.searchCompanies).toHaveBeenCalledWith({
       query: 'ai',
+      sector: 'Fintech',
+      location: 'United Kingdom',
+      page: 2,
       limit: 5,
-      filters: {
-        industry: undefined,
-        country: 'United States',
-        minEmployees: 100,
-        maxEmployees: undefined,
-      },
     });
   });
 
-  it('should proxy company lookup by id', () => {
-    serviceMock.getCompanyById.mockReturnValue({ id: 'c-101' });
+  it('should proxy company lookup by id', async () => {
+    serviceMock.getCompanyById.mockResolvedValue({ id: 'c-101' });
 
-    expect(controller.getById('c-101')).toEqual({ id: 'c-101' });
+    await expect(controller.getById('c-101')).resolves.toEqual({ id: 'c-101' });
   });
 });
