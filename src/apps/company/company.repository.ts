@@ -35,10 +35,39 @@ export class CompanyRepository {
       query.andWhere('company.tags @> :tags', { tags: JSON.stringify(filters.tags) });
     }
     if (filters.query) {
-      query.andWhere('(company.name ILIKE :query OR company.sector ILIKE :query OR company.subSector ILIKE :query)', {
-        query: `%${filters.query}%`,
-      });
+      const normalizedQuery = filters.query.trim();
+      query
+        .addSelect(
+          `GREATEST(
+            similarity(company.name, :similarityQuery),
+            similarity(company.sector, :similarityQuery),
+            similarity(company.subSector, :similarityQuery),
+            similarity(company.location, :similarityQuery)
+          )`,
+          'similarity_rank',
+        )
+        .andWhere(
+          `(
+            company.name ILIKE :partialQuery
+            OR company.sector ILIKE :partialQuery
+            OR company.subSector ILIKE :partialQuery
+            OR company.location ILIKE :partialQuery
+            OR similarity(company.name, :similarityQuery) > 0.2
+            OR similarity(company.sector, :similarityQuery) > 0.2
+            OR similarity(company.subSector, :similarityQuery) > 0.2
+            OR similarity(company.location, :similarityQuery) > 0.2
+          )`,
+          {
+            partialQuery: `%${normalizedQuery}%`,
+            similarityQuery: normalizedQuery,
+          },
+        )
+        .orderBy('similarity_rank', 'DESC')
+        .addOrderBy('company.createdAt', 'DESC');
+
+      return query;
     }
+
     return query.orderBy('company.createdAt', 'DESC');
   }
 
