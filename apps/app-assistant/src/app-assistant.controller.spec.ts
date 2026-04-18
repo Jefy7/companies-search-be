@@ -3,20 +3,39 @@ import { AppAssistantController } from './app-assistant.controller';
 import { AppAssistantService } from './app-assistant.service';
 
 describe('AppAssistantController', () => {
-  let appAssistantController: AppAssistantController;
+  let controller: AppAssistantController;
+
+  const serviceMock = {
+    assistCompanySearch: jest.fn(),
+  };
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppAssistantController],
-      providers: [AppAssistantService],
+      providers: [
+        {
+          provide: AppAssistantService,
+          useValue: serviceMock,
+        },
+      ],
     }).compile();
 
-    appAssistantController = app.get<AppAssistantController>(AppAssistantController);
+    controller = app.get<AppAssistantController>(AppAssistantController);
+    jest.clearAllMocks();
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appAssistantController.getHello()).toBe('Hello World!');
+  it('should return healthy state', () => {
+    expect(controller.health()).toEqual({ status: 'ok' });
+  });
+
+  it('should forward body to assistant service', () => {
+    serviceMock.assistCompanySearch.mockReturnValue({ explanation: 'Found 1 companies' });
+
+    expect(controller.assistSearch({ prompt: 'find ai companies' })).toEqual({
+      explanation: 'Found 1 companies',
+    });
+    expect(serviceMock.assistCompanySearch).toHaveBeenCalledWith({
+      prompt: 'find ai companies',
     });
   });
 });

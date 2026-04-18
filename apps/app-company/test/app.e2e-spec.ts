@@ -15,10 +15,12 @@ describe('AppCompanyController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('/companies/search (GET)', () => {
     return request(app.getHttpServer())
-      .get('/')
+      .get('/companies/search?q=ai')
       .expect(200)
-      .expect('Hello World!');
+      .expect((response) => {
+        expect(response.body.total).toBeGreaterThan(0);
+      });
   });
 });
