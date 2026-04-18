@@ -15,10 +15,10 @@ describe('AppAssistantController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('/assistant/health (GET)', () => {
     return request(app.getHttpServer())
-      .get('/')
+      .get('/assistant/health')
       .expect(200)
-      .expect('Hello World!');
+      .expect({ status: 'ok' });
   });
 });
