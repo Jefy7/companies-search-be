@@ -1,6 +1,7 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 
+import { AiQueryDto } from '../ai/dto/ai-query.dto';
 import { Company } from '../../libs/db/entities/company.entity';
 import { createCsvStream } from '../../libs/utils/csv.util';
 import { CompanyRepository } from './company.repository';
@@ -17,6 +18,11 @@ export class CompanyController {
   @Get()
   public async search(@Query() query: SearchCompanyDto) {
     return this.companyService.search(query);
+  }
+
+  @Post('assistant-search')
+  public async assistantSearch(@Body() dto: AiQueryDto) {
+    return this.companyService.assistantSearch(dto);
   }
 
   @Get('export')
