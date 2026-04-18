@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream';
 
-import { Company } from '../database/entities/company.entity';
+import { Company } from '../db/entities/company.entity';
 
 export const createCsvStream = (companies: AsyncIterable<Partial<Company>>): Readable => {
   const header = 'name,email,phone,sector,subSector,location,linkedin\n';

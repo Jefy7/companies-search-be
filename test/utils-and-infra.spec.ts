@@ -1,11 +1,11 @@
 import { ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 
-import { RedisService } from '../src/cache/redis.service';
-import { GlobalExceptionFilter } from '../src/common/exceptions/global-exception.filter';
-import { HttpAiClient } from '../src/modules/ai/ai.client';
-import { Company as ReExportCompany } from '../src/modules/company/entity/company.entity';
-import { createCsvStream } from '../src/utils/csv.util';
-import { hashValue } from '../src/utils/hash.util';
+import { RedisService } from '../src/libs/redis/redis.service';
+import { GlobalExceptionFilter } from '../src/apps/common/exceptions/global-exception.filter';
+import { HttpAiClient } from '../src/apps/ai/ai.client';
+import { Company as ReExportCompany } from '../src/apps/company/entity/company.entity';
+import { createCsvStream } from '../src/libs/utils/csv.util';
+import { hashValue } from '../src/libs/utils/hash.util';
 
 describe('Utils and infra', () => {
   it('hashValue is deterministic', () => {

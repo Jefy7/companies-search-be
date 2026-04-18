@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 
-import { RedisService } from '../../cache/redis.service';
-import { hashValue } from '../../utils/hash.util';
+import { RedisService } from '../../libs/redis/redis.service';
+import { hashValue } from '../../libs/utils/hash.util';
 import { SearchCompanyDto } from '../company/dto/search-company.dto';
 
 export interface AiClient {

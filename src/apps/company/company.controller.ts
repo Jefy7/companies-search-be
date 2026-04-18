@@ -1,8 +1,8 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 
-import { Company } from '../../database/entities/company.entity';
-import { createCsvStream } from '../../utils/csv.util';
+import { Company } from '../../libs/db/entities/company.entity';
+import { createCsvStream } from '../../libs/utils/csv.util';
 import { CompanyRepository } from './company.repository';
 import { CompanyService } from './company.service';
 import { SearchCompanyDto } from './dto/search-company.dto';

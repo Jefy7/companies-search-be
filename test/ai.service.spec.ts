@@ -1,6 +1,6 @@
 import { HttpException } from '@nestjs/common';
 
-import { AiService } from '../src/modules/ai/ai.service';
+import { AiService } from '../src/apps/ai/ai.service';
 
 describe('AiService', () => {
   it('returns cached parsed filters', async () => {
