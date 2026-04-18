@@ -1,4 +1,4 @@
-import { CompanyRepository } from '../src/modules/company/company.repository';
+import { CompanyRepository } from '../src/apps/company/company.repository';
 
 const createQb = () => {
   const qb: Record<string, jest.Mock> = {

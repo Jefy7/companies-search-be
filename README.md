@@ -11,6 +11,23 @@ npm run lint
 npm run build
 ```
 
+
+## Workspace-style layout
+
+```
+src/
+  apps/
+    ai/
+    company/
+    search/
+    common/
+  libs/
+    db/
+    redis/
+    utils/
+    logger/
+```
+
 ## Environment variables
 
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`

@@ -2,13 +2,13 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 
-import { GlobalExceptionFilter } from '../src/common/exceptions/global-exception.filter';
-import { AiService } from '../src/modules/ai/ai.service';
-import { CompanyController } from '../src/modules/company/company.controller';
-import { CompanyRepository } from '../src/modules/company/company.repository';
-import { CompanyService } from '../src/modules/company/company.service';
-import { SearchController } from '../src/modules/search/search.controller';
-import { SearchService } from '../src/modules/search/search.service';
+import { GlobalExceptionFilter } from '../src/apps/common/exceptions/global-exception.filter';
+import { AiService } from '../src/apps/ai/ai.service';
+import { CompanyController } from '../src/apps/company/company.controller';
+import { CompanyRepository } from '../src/apps/company/company.repository';
+import { CompanyService } from '../src/apps/company/company.service';
+import { SearchController } from '../src/apps/search/search.controller';
+import { SearchService } from '../src/apps/search/search.service';
 
 describe('Controllers integration', () => {
   let app: INestApplication;

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { SelectQueryBuilder, Repository } from 'typeorm';
 
-import { Company } from '../../database/entities/company.entity';
+import { Company } from '../../libs/db/entities/company.entity';
 import { SearchCompanyDto } from './dto/search-company.dto';
 
 export interface PaginatedCompanies {

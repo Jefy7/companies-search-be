@@ -1,4 +1,4 @@
-import { CompanyService } from '../src/modules/company/company.service';
+import { CompanyService } from '../src/apps/company/company.service';
 
 describe('CompanyService', () => {
   it('delegates search', async () => {

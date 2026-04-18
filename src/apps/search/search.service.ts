@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { RedisService } from '../../cache/redis.service';
-import { hashValue } from '../../utils/hash.util';
+import { RedisService } from '../../libs/redis/redis.service';
+import { hashValue } from '../../libs/utils/hash.util';
 import { CompanyRepository, PaginatedCompanies } from '../company/company.repository';
 import { SearchCompanyDto } from '../company/dto/search-company.dto';
 

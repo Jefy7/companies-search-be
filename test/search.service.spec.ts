@@ -1,5 +1,5 @@
-import { SearchService } from '../src/modules/search/search.service';
-import { SearchCompanyDto } from '../src/modules/company/dto/search-company.dto';
+import { SearchService } from '../src/apps/search/search.service';
+import { SearchCompanyDto } from '../src/apps/company/dto/search-company.dto';
 
 describe('SearchService', () => {
   it('returns cached value when present', async () => {
