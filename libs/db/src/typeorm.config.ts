@@ -10,17 +10,15 @@ const parseNumber = (value: string | undefined, fallback: number): number => {
 export const createTypeOrmOptions = (
   configService: ConfigService,
 ): TypeOrmModuleOptions => {
-  const dbType = configService.get<TypeOrmModuleOptions['type']>('DB_TYPE', 'postgres');
-
   return {
-    type: dbType,
+    type: 'postgres', // ✅ fixed type
     host: configService.get<string>('DB_HOST', 'localhost'),
     port: parseNumber(configService.get<string>('DB_PORT'), 5432),
     username: configService.get<string>('DB_USERNAME', 'postgres'),
     password: configService.get<string>('DB_PASSWORD', 'postgres'),
     database: configService.get<string>('DB_NAME', 'companies_search'),
     autoLoadEntities: true,
-    synchronize: configService.get<string>('DB_SYNC', 'false') === 'true',
+    synchronize: false,
   };
 };
 

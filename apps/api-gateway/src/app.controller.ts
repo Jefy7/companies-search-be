@@ -3,12 +3,7 @@ import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
-  @Get('health')
-  getHealth() {
-    return this.appService.getServiceInfo();
-  }
+  constructor(private readonly appService: AppService) { }
 
   @Get('assistant/quick-search')
   quickSearch(@Query('prompt') prompt = '') {
