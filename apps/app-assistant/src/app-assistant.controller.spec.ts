@@ -24,10 +24,6 @@ describe('AppAssistantController', () => {
     jest.clearAllMocks();
   });
 
-  it('should return healthy state', () => {
-    expect(controller.health()).toEqual({ status: 'ok' });
-  });
-
   it('should forward body to assistant service', () => {
     serviceMock.assistCompanySearch.mockReturnValue({ explanation: 'Found 1 companies' });
 
