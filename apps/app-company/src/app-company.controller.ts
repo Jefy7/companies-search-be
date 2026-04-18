@@ -1,37 +1,24 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import {
-  AppCompanyService,
-  CompanySearchRequest,
-  CompanySearchResponse,
-} from './app-company.service';
+import { AppCompanyService } from './app-company.service';
+import { CompanySearchQueryDto } from './dto/company-search.dto';
 
 @Controller('companies')
 export class AppCompanyController {
   constructor(private readonly appCompanyService: AppCompanyService) {}
 
   @Get('search')
-  search(@Query() query: Record<string, string | undefined>): CompanySearchResponse {
-    const request = this.buildSearchRequest(query);
-    return this.appCompanyService.searchCompanies(request);
+  async search(@Query() query: CompanySearchQueryDto) {
+    return this.appCompanyService.searchCompanies({
+      query: query.query,
+      sector: query.sector,
+      location: query.location,
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
+    });
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
+  async getById(@Param('id') id: string) {
     return this.appCompanyService.getCompanyById(id);
-  }
-
-  private buildSearchRequest(
-    query: Record<string, string | undefined>,
-  ): CompanySearchRequest {
-    return {
-      query: query.q ?? '',
-      limit: query.limit ? Number(query.limit) : undefined,
-      filters: {
-        industry: query.industry,
-        country: query.country,
-        minEmployees: query.minEmployees ? Number(query.minEmployees) : undefined,
-        maxEmployees: query.maxEmployees ? Number(query.maxEmployees) : undefined,
-      },
-    };
   }
 }

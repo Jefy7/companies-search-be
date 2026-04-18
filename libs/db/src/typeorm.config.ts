@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleAsyncOptions, TypeOrmModuleOptions } from '@nestjs/typeorm';
 
 const parseNumber = (value: string | undefined, fallback: number): number => {
@@ -7,22 +6,19 @@ const parseNumber = (value: string | undefined, fallback: number): number => {
   return Number.isNaN(parsed) ? fallback : parsed;
 };
 
-export const createTypeOrmOptions = (
-  configService: ConfigService,
-): TypeOrmModuleOptions => {
+export const createTypeOrmOptions = (): TypeOrmModuleOptions => {
   return {
-    type: 'postgres', // ✅ fixed type
-    host: configService.get<string>('DB_HOST', 'localhost'),
-    port: parseNumber(configService.get<string>('DB_PORT'), 5432),
-    username: configService.get<string>('DB_USERNAME', 'postgres'),
-    password: configService.get<string>('DB_PASSWORD', 'postgres'),
-    database: configService.get<string>('DB_NAME', 'companies_search'),
+    type: 'postgres',
+    host: process.env.DB_HOST ?? 'localhost',
+    port: parseNumber(process.env.DB_PORT, 5432),
+    username: process.env.DB_USERNAME ?? 'postgres',
+    password: process.env.DB_PASSWORD ?? 'postgres',
+    database: process.env.DB_NAME ?? 'companies_search',
     autoLoadEntities: true,
     synchronize: false,
   };
 };
 
 export const typeOrmConfig: TypeOrmModuleAsyncOptions = {
-  inject: [ConfigService],
-  useFactory: (configService: ConfigService) => createTypeOrmOptions(configService),
+  useFactory: () => createTypeOrmOptions(),
 };

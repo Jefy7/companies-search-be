@@ -1,150 +1,138 @@
 import { Injectable } from '@nestjs/common';
-import { CommonService } from '@lib/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Brackets, Repository } from 'typeorm';
+import { Company } from './entities/company.entity';
 
 export interface CompanyRecord {
   id: string;
   name: string;
-  domain: string;
-  industry: string;
-  country: string;
-  employeeCount: number;
+  email: string;
+  phone: string;
+  sector: string;
+  subSector: string | null;
+  location: string;
+  linkedin: string | null;
   tags: string[];
-  description: string;
 }
 
 export interface CompanySearchFilters {
-  industry?: string;
-  country?: string;
-  minEmployees?: number;
-  maxEmployees?: number;
+  sector?: string;
+  location?: string;
+  tags?: string[];
 }
 
-export interface CompanySearchParams {
-  query: string;
-  limit?: number;
-  filters?: CompanySearchFilters;
+export interface PaginationParams {
+  page: number;
+  limit: number;
+}
+
+export interface CompanySearchResult {
+  data: CompanyRecord[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 @Injectable()
 export class DbService {
-  constructor(private readonly commonService: CommonService) {}
+  constructor(
+    @InjectRepository(Company)
+    private readonly companyRepository: Repository<Company>,
+  ) {}
 
-  private readonly companies: CompanyRecord[] = [
-    {
-      id: 'c-101',
-      name: 'OpenScale Analytics',
-      domain: 'openscale.ai',
-      industry: 'Artificial Intelligence',
-      country: 'United States',
-      employeeCount: 230,
-      tags: ['llm', 'rag', 'analytics'],
-      description: 'AI platform focused on retrieval-augmented enterprise analytics.',
-    },
-    {
-      id: 'c-102',
-      name: 'BlueCart Commerce',
-      domain: 'bluecart.io',
-      industry: 'E-Commerce',
-      country: 'United States',
-      employeeCount: 95,
-      tags: ['marketplace', 'retail', 'payments'],
-      description: 'B2B commerce operating tools for distributors and retailers.',
-    },
-    {
-      id: 'c-103',
-      name: 'Nimbus Cyber Defense',
-      domain: 'nimbuscyber.com',
-      industry: 'Cybersecurity',
-      country: 'Canada',
-      employeeCount: 420,
-      tags: ['siem', 'security', 'threat-intel'],
-      description: 'Cloud-native threat monitoring and incident response automation.',
-    },
-    {
-      id: 'c-104',
-      name: 'Helio Health Systems',
-      domain: 'heliohealth.io',
-      industry: 'HealthTech',
-      country: 'United States',
-      employeeCount: 160,
-      tags: ['ehr', 'telehealth', 'compliance'],
-      description: 'Digital patient engagement and clinical workflow platform.',
-    },
-    {
-      id: 'c-105',
-      name: 'Vertex Logistics Network',
-      domain: 'vertexlogistics.net',
-      industry: 'Logistics',
-      country: 'Germany',
-      employeeCount: 1100,
-      tags: ['supply-chain', 'routing', 'fleet'],
-      description: 'Cross-border freight optimization and route intelligence.',
-    },
-  ];
-
-  findById(id: string): CompanyRecord | undefined {
-    return this.companies.find((company) => company.id === id);
+  async findById(id: string): Promise<CompanyRecord | null> {
+    const company = await this.companyRepository.findOne({ where: { id } });
+    return company ? this.mapCompany(company) : null;
   }
 
-  searchCompanies(params: CompanySearchParams): CompanyRecord[] {
-    const { query, limit = 10, filters } = params;
-    const normalizedIndustry = filters?.industry
-      ? this.commonService.normalizeText(filters.industry)
-      : undefined;
-    const normalizedCountry = filters?.country
-      ? this.commonService.normalizeText(filters.country)
-      : undefined;
+  async search(
+    filters: CompanySearchFilters,
+    query: string,
+    similarTerms: string[],
+    pagination: PaginationParams,
+  ): Promise<CompanySearchResult> {
+    const qb = this.companyRepository.createQueryBuilder('company');
 
-    const scored = this.companies
-      .filter((company) => {
-        if (
-          normalizedIndustry &&
-          this.commonService.normalizeText(company.industry) !== normalizedIndustry
-        ) {
-          return false;
-        }
+    if (filters.sector) {
+      qb.andWhere('company.sector ILIKE :sector', { sector: filters.sector });
+    }
 
-        if (
-          normalizedCountry &&
-          this.commonService.normalizeText(company.country) !== normalizedCountry
-        ) {
-          return false;
-        }
+    if (filters.location) {
+      qb.andWhere('company.location ILIKE :location', { location: filters.location });
+    }
 
-        if (
-          typeof filters?.minEmployees === 'number' &&
-          company.employeeCount < filters.minEmployees
-        ) {
-          return false;
-        }
+    if (filters.tags && filters.tags.length > 0) {
+      qb.andWhere(
+        new Brackets((tagsQb) => {
+          filters.tags?.forEach((tag, index) => {
+            tagsQb.orWhere(`CAST(company.tags AS text) ILIKE :tag_${index}`, {
+              [`tag_${index}`]: `%${tag}%`,
+            });
+          });
+        }),
+      );
+    }
 
-        if (
-          typeof filters?.maxEmployees === 'number' &&
-          company.employeeCount > filters.maxEmployees
-        ) {
-          return false;
-        }
+    const cleanedQuery = query.trim();
+    const cleanedTerms = similarTerms
+      .map((term) => term.trim())
+      .filter((term) => term.length > 0);
 
-        return true;
-      })
-      .map((company) => {
-        const textCorpus = [
-          company.name,
-          company.description,
-          company.industry,
-          company.tags.join(' '),
-        ].join(' ');
+    if (cleanedQuery || cleanedTerms.length > 0) {
+      qb.andWhere(
+        new Brackets((textQb) => {
+          if (cleanedQuery) {
+            textQb
+              .orWhere('company.name ILIKE :queryPattern', {
+                queryPattern: `%${cleanedQuery}%`,
+              })
+              .orWhere('CAST(company.tags AS text) ILIKE :queryPattern', {
+                queryPattern: `%${cleanedQuery}%`,
+              })
+              .orWhere(
+                "to_tsvector('simple', company.name || ' ' || COALESCE(CAST(company.tags AS text), '')) @@ plainto_tsquery('simple', :ftsQuery)",
+                { ftsQuery: cleanedQuery },
+              );
+          }
 
-        return {
-          company,
-          score: this.commonService.scoreTextMatch(query, textCorpus),
-        };
-      })
-      .filter((entry) => entry.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((entry) => entry.company);
+          cleanedTerms.forEach((term, index) => {
+            textQb
+              .orWhere(`company.name ILIKE :similar_${index}`, {
+                [`similar_${index}`]: `%${term}%`,
+              })
+              .orWhere(`CAST(company.tags AS text) ILIKE :similar_${index}`, {
+                [`similar_${index}`]: `%${term}%`,
+              });
+          });
+        }),
+      );
+    }
 
-    return this.commonService.uniqueBy(scored, (item) => item.id);
+    qb.orderBy('company.name', 'ASC')
+      .skip((pagination.page - 1) * pagination.limit)
+      .take(pagination.limit);
+
+    const [companies, total] = await qb.getManyAndCount();
+
+    return {
+      data: companies.map((company) => this.mapCompany(company)),
+      total,
+      page: pagination.page,
+      limit: pagination.limit,
+    };
+  }
+
+  private mapCompany(company: Company): CompanyRecord {
+    return {
+      id: company.id,
+      name: company.name,
+      email: company.email,
+      phone: company.phone,
+      sector: company.sector,
+      subSector: company.subSector ?? null,
+      location: company.location,
+      linkedin: company.linkedin ?? null,
+      tags: company.tags ?? [],
+    };
   }
 }
