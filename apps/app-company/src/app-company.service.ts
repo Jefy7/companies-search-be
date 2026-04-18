@@ -27,7 +27,7 @@ export class AppCompanyService {
     private readonly dbService: DbService,
     private readonly aiService: AiService,
     private readonly loggerService: LoggerService,
-  ) {}
+  ) { }
 
   async searchCompanies(params: SearchCompaniesParams): Promise<SearchCompaniesResponse> {
     const aiResult = await this.aiService.enhanceSearch(params.query);
