@@ -4,11 +4,11 @@ import { LoggerModule } from '@lib/logger';
 import { AppCompanyController } from './app-company.controller';
 import { AppCompanyService } from './app-company.service';
 import { AiService } from './ai/ai.service';
-
+import { CacheService } from '@lib/cache';
 @Module({
   imports: [DbModule, LoggerModule],
   controllers: [AppCompanyController],
-  providers: [AppCompanyService, AiService],
+  providers: [AppCompanyService, AiService, CacheService],
   exports: [AppCompanyService],
 })
-export class AppCompanyModule {}
+export class AppCompanyModule { }
