@@ -7,6 +7,7 @@ import { AiSearchResponseDto } from './ai-search.dto';
 export interface AiSearchResult {
   filters: {
     sector?: string;
+    subSector?: string;
     location?: string;
     tags?: string[];
   };
@@ -17,9 +18,9 @@ export interface AiSearchResult {
 
 @Injectable()
 export class AiService {
-  private static readonly TIMEOUT_MS = 3000;
+  private static readonly TIMEOUT_MS = 15000;
 
-  constructor(private readonly loggerService: LoggerService) {}
+  constructor(private readonly loggerService: LoggerService) { }
 
   async enhanceSearch(query: string): Promise<AiSearchResult | null> {
     const endpoint = process.env.AI_SEARCH_ENDPOINT ?? 'http://localhost:8000/api/v1/ai/search';

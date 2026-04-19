@@ -17,6 +17,7 @@ export interface CompanyRecord {
 
 export interface CompanySearchFilters {
   sector?: string;
+  subSector?: string;
   location?: string;
   tags?: string[];
 }
@@ -32,13 +33,12 @@ export interface CompanySearchResult {
   page: number;
   limit: number;
 }
-
 @Injectable()
 export class DbService {
   constructor(
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
-  ) {}
+  ) { }
 
   async findById(id: string): Promise<CompanyRecord | null> {
     const company = await this.companyRepository.findOne({ where: { id } });
@@ -47,25 +47,37 @@ export class DbService {
 
   async search(
     filters: CompanySearchFilters,
-    query: string,
-    similarTerms: string[],
     pagination: PaginationParams,
+    query?: string,
+    similarTerms?: string[],
   ): Promise<CompanySearchResult> {
     const qb = this.companyRepository.createQueryBuilder('company');
-
+    console.log("filters ==> ", filters)
+    // ✅ FIX 1: Use LIKE properly with %
     if (filters.sector) {
-      qb.andWhere('company.sector ILIKE :sector', { sector: filters.sector });
+      qb.andWhere('company.sector ILIKE :sector', {
+        sector: `%${filters.sector}%`,
+      });
     }
 
     if (filters.location) {
-      qb.andWhere('company.location ILIKE :location', { location: filters.location });
+      qb.andWhere('company.location ILIKE :location', {
+        location: `%${filters.location}%`,
+      });
     }
 
+    if (filters.subSector) {
+      qb.andWhere('company.sub_sector ILIKE :subSector', {
+        subSector: filters.subSector,
+      });
+    }
+
+    // ✅ FIX 2: Tags search improved
     if (filters.tags && filters.tags.length > 0) {
       qb.andWhere(
         new Brackets((tagsQb) => {
-          filters.tags?.forEach((tag, index) => {
-            tagsQb.orWhere(`CAST(company.tags AS text) ILIKE :tag_${index}`, {
+          filters.tags!.forEach((tag, index) => {
+            tagsQb.orWhere(`company.tags::text ILIKE :tag_${index}`, {
               [`tag_${index}`]: `%${tag}%`,
             });
           });
@@ -73,44 +85,55 @@ export class DbService {
       );
     }
 
-    const cleanedQuery = query.trim();
-    const cleanedTerms = similarTerms
-      .map((term) => term.trim())
-      .filter((term) => term.length > 0);
+    const keywords = [
+      query?.trim(),
+      ...(similarTerms ?? []).map((t) => t.trim()),
+    ].filter((k): k is string => Boolean(k && k.length > 0));
 
-    if (cleanedQuery || cleanedTerms.length > 0) {
+    // ✅ FIX 3: Strong text search across ALL columns
+    if (keywords.length > 0) {
       qb.andWhere(
         new Brackets((textQb) => {
-          if (cleanedQuery) {
-            textQb
-              .orWhere('company.name ILIKE :queryPattern', {
-                queryPattern: `%${cleanedQuery}%`,
-              })
-              .orWhere('CAST(company.tags AS text) ILIKE :queryPattern', {
-                queryPattern: `%${cleanedQuery}%`,
-              })
-              .orWhere(
-                "to_tsvector('simple', company.name || ' ' || COALESCE(CAST(company.tags AS text), '')) @@ plainto_tsquery('simple', :ftsQuery)",
-                { ftsQuery: cleanedQuery },
-              );
-          }
-
-          cleanedTerms.forEach((term, index) => {
-            textQb
-              .orWhere(`company.name ILIKE :similar_${index}`, {
-                [`similar_${index}`]: `%${term}%`,
-              })
-              .orWhere(`CAST(company.tags AS text) ILIKE :similar_${index}`, {
-                [`similar_${index}`]: `%${term}%`,
-              });
+          keywords.forEach((term, index) => {
+            textQb.orWhere(
+              `
+              (
+                company.name ILIKE :kw${index}
+                OR company.sector ILIKE :kw${index}
+                OR company.subSector ILIKE :kw${index}
+                OR company.location ILIKE :kw${index}
+                OR company.tags::text ILIKE :kw${index}
+              )
+              `,
+              { [`kw${index}`]: `%${term}%` },
+            );
           });
         }),
       );
+
+      // ✅ FIX 4: Add FULL-TEXT SEARCH (Postgres powerful search)
+      qb.addSelect(
+        `
+        ts_rank(
+          to_tsvector('english',
+            company.name || ' ' ||
+            company.sector || ' ' ||
+            COALESCE(company.subSector, '') || ' ' ||
+            company.location || ' ' ||
+            COALESCE(company.tags::text, '')
+          ),
+          plainto_tsquery('english', :ftsQuery)
+        )
+      `,
+        'rank',
+      ).setParameter('ftsQuery', keywords.join(' '));
+
+      qb.orderBy('rank', 'DESC');
+    } else {
+      qb.orderBy('company.name', 'ASC');
     }
 
-    qb.orderBy('company.name', 'ASC')
-      .skip((pagination.page - 1) * pagination.limit)
-      .take(pagination.limit);
+    qb.skip((pagination.page - 1) * pagination.limit).take(pagination.limit);
 
     const [companies, total] = await qb.getManyAndCount();
 

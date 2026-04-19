@@ -4,8 +4,9 @@ import { LoggerService } from '@lib/logger';
 import { AiService } from './ai/ai.service';
 
 export interface SearchCompaniesParams {
-  query: string;
+  query?: string;
   sector?: string;
+  subSector?: string;
   location?: string;
   page: number;
   limit: number;
@@ -16,7 +17,7 @@ export interface SearchCompaniesResponse {
   total: number;
   page: number;
   limit: number;
-  aiSuggestions: string[];
+  aiSuggestions?: string[];
 }
 
 @Injectable()
@@ -30,36 +31,39 @@ export class AppCompanyService {
   ) { }
 
   async searchCompanies(params: SearchCompaniesParams): Promise<SearchCompaniesResponse> {
-    const aiResult = await this.aiService.enhanceSearch(params.query);
+
+    this.loggerService.info("params", 'input', { params })
+    let aiResult = null
+    if (params.query)
+      aiResult = await this.aiService.enhanceSearch(params.query);
+
+    this.loggerService.info('AI Result', 'AppCompanyService', {
+      aiResult,
+    });
 
     const canApplyAi =
-      aiResult !== null && aiResult.confidence >= AppCompanyService.AI_CONFIDENCE_THRESHOLD;
+      aiResult !== null &&
+      aiResult.confidence >= AppCompanyService.AI_CONFIDENCE_THRESHOLD;
 
     const mergedFilters = {
-      sector: params.sector ?? (canApplyAi ? aiResult.filters.sector : undefined),
-      location: params.location ?? (canApplyAi ? aiResult.filters.location : undefined),
-      tags: canApplyAi ? aiResult.filters.tags ?? [] : [],
+      sector: params.sector ?? (canApplyAi ? aiResult?.filters.sector : undefined),
+      subSector: params.subSector ?? (canApplyAi ? aiResult?.filters.subSector : undefined),
+      location: params.location ?? (canApplyAi ? aiResult?.filters.location : undefined),
+      tags: canApplyAi ? aiResult?.filters.tags ?? [] : [],
     };
 
-    const similarTerms = canApplyAi ? aiResult.similarTerms : [];
-
-    if (!canApplyAi && aiResult !== null) {
-      this.loggerService.info('AI confidence below threshold, fallback to user input', 'AppCompanyService', {
-        confidence: aiResult.confidence,
-        threshold: AppCompanyService.AI_CONFIDENCE_THRESHOLD,
-      });
-    }
-
+    const similarTerms = canApplyAi ? aiResult?.similarTerms : [];
+    this.loggerService.info("mergedFilters", "mergedFilters", { mergedFilters })
     const result = await this.dbService.search(
       mergedFilters,
+      { page: params.page, limit: params.limit },
       params.query,
       similarTerms,
-      { page: params.page, limit: params.limit },
     );
 
     return {
       ...result,
-      aiSuggestions: canApplyAi ? aiResult.suggestions : [],
+      aiSuggestions: canApplyAi ? aiResult?.suggestions : [],
     };
   }
 
